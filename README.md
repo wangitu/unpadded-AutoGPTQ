@@ -7,11 +7,23 @@
     </p>
 </h4>
 
+## Installation
+
+### Install from source
+Clone the source code:
+```Bash
+git clone https://github.com/wangitu/unpadded-AutoGPTQ.git && cd unpadded-AutoGPTQ
+```
+Then, install from source as an editable package:
+```Bash
+pip install -v -e .
+```
+
 ## Three major updates
 
 1. Address the issue where certain models, such as Qwen, have several arguments (e.g. `rotary_pos_emb_list`) on the CPU when invoking `QWenAttention`. This occurs if `max_memory` is not specified when calling `AutoGPTQForCausalLM.from_pretrained`.
-2. Implement support for unpadded model quantization. AutoGPTQ utilizes a list to maintain the attention mask for each batch in the inputs. Some models, like Baichuan, have an attention mask with the shape `(batch_size, num_head, seq_length, seq_length)`. **Assuming a total sample size of 1024 and a sequence length of 1024, The Baichuan2-13B model (with 40 layers) is estimated to consume approximately 80GiB of GPU memory for storing `attention masks`**.  
-To enable unpadded quantization, it's essential to ensure that **each batch in the inputs should contain an equal number of samples, and every sample within a batch should have `input_ids` and `attention_mask` of equal length**. We provide a simple function to implement this:
+2. Implement support for unpadded model quantization. AutoGPTQ utilizes a list to maintain the attention mask for each batch in the inputs. Some models, like Baichuan, have an attention mask with the shape `(batch_size, num_head, seq_length, seq_length)`. **Assuming a total sample size of 1024 and a sequence length of 1024, The Baichuan2-13B model (with 40 layers) is estimated to consume approximately 80GiB of GPU memory for storing `attention_masks`**.  
+To enable unpadded quantization, it's essential to ensure that **each batch in the inputs should contain an equal number of samples, and samples across different batches should have `input_ids` and `attention_mask` of equal length**. We provide a simple script to implement this:
     ```Python
     def group_texts(examples, text_cutoff_length, quant_batch_size):
         concatenate_examples = {k: list(chain(*examples[k])) for k in examples}
@@ -29,6 +41,7 @@ To enable unpadded quantization, it's essential to ensure that **each batch in t
 ## Quick tour
 
 ### Quantization (see ./quantize_with_gpt4.py)
+Below is an example for quantizing a model with unpadded inputs:
 ```Python
 import sys
 import os

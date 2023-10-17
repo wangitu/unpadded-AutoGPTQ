@@ -5,7 +5,7 @@ import fire
 
 import torch
 from transformers import AutoTokenizer, GenerationConfig
-from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig
+from auto_gptq import AutoGPTQForCausalLM
 import gradio as gr
 
 from app_components import Prompter

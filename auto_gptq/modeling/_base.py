@@ -240,6 +240,10 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
         examples = self._prepare_examples_for_quantization(examples, batch_size)
         
+        if unpadded:
+            shape = examples[0]['input_ids'].shape
+            assert all(e['input_ids'].shape == e['attention_mask'].shape == shape for e in examples), """each batch in the inputs should contain an equal number of samples, and samples across different batches should have `input_ids` and `attention_mask` of equal length"""
+        
         def nested_move_to_device(v, device):
             if isinstance(v, torch.Tensor):
                 return move_to_device(v, device)
