@@ -214,7 +214,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         use_triton: bool = False,
         use_cuda_fp16: bool = True,
         autotune_warmup_after_quantized: bool = False,
-        cache_examples_on_gpu: bool = True
+        cache_examples_on_gpu: bool = True,
+        unpadded: bool = False
     ):
         if self.quantized:
             raise EnvironmentError("can't execute quantize because the model is quantized.")
@@ -232,12 +233,20 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     accelerate.cpu_offload_with_hook(module, CUDA_0)
 
         layer_inputs = []
-        attention_masks = []
+        attention_masks = None if unpadded else []
         position_ids = []
         layer_input_kwargs = []
         layer_outputs = []
 
         examples = self._prepare_examples_for_quantization(examples, batch_size)
+        
+        def nested_move_to_device(v, device):
+            if isinstance(v, torch.Tensor):
+                return move_to_device(v, device)
+            elif isinstance(v, (list, tuple)):
+                return type(v)([nested_move_to_device(e, device) for e in v])
+            else:
+                return v
 
         class LayerHijacker(nn.Module):
             """hijack layer's forward pass to cache data"""
@@ -254,17 +263,22 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                             inp = kwargs[kwarg_name]
                             break
                 layer_inputs.append(move_to_device(inp, self.data_device))
-                attention_masks.append(kwargs["attention_mask"].to(self.data_device))
+                if unpadded:
+                    nonlocal attention_masks
+                    attention_masks = kwargs["attention_mask"].to(self.data_device) if attention_masks is None else attention_masks
+                else:
+                    attention_masks.append(kwargs["attention_mask"].to(self.data_device))
                 pos_ids = kwargs.get("position_ids", None)
                 if pos_ids is not None:
                     position_ids.append(move_to_device(pos_ids, self.data_device))
                 one_kwargs = dict()
                 for k, v in kwargs.items():  # make sure other arguments also be captured
                     if k not in ["hidden_states", "attention_mask", "position_ids"]:
-                        if isinstance(v, torch.Tensor):
-                            one_kwargs[k] = move_to_device(v, self.data_device)
-                        else:
-                            one_kwargs[k] = v
+                        # if isinstance(v, torch.Tensor):
+                        #     one_kwargs[k] = move_to_device(v, self.data_device)
+                        # else:
+                        #     one_kwargs[k] = v
+                        one_kwargs[k] = nested_move_to_device(v, self.data_device)
                 layer_input_kwargs.append(one_kwargs)
                 raise ValueError
 
@@ -353,7 +367,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     handles.append(subset[name].register_forward_hook(add_batch(name)))
                 for j in range(num_batches):
                     layer_input = move_to_device(layer_inputs[j], cur_layer_device)
-                    layer_attention_mask = move_to_device(attention_masks[j], cur_layer_device)
+                    layer_attention_mask = move_to_device(attention_masks if unpadded else attention_masks[j], cur_layer_device)
                     additional_layer_inputs = {
                         "attention_mask": layer_attention_mask
                     }
@@ -361,10 +375,11 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     if layer_position_ids is not None:
                         additional_layer_inputs["position_ids"] = layer_position_ids
                     for k, v in layer_input_kwargs[j].items():
-                        if isinstance(v, torch.Tensor):
-                            additional_layer_inputs[k] = move_to_device(v, cur_layer_device)
-                        else:
-                            additional_layer_inputs[k] = v
+                        # if isinstance(v, torch.Tensor):
+                        #     additional_layer_inputs[k] = move_to_device(v, cur_layer_device)
+                        # else:
+                        #     additional_layer_inputs[k] = v
+                        additional_layer_inputs[k] = nested_move_to_device(v, cur_layer_device)
                     layer(layer_input, **additional_layer_inputs)
                 for h in handles:
                     h.remove()
@@ -387,7 +402,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
             for j in range(num_batches):
                 layer_input = move_to_device(layer_inputs[j], cur_layer_device)
-                layer_attention_mask = move_to_device(attention_masks[j], cur_layer_device)
+                layer_attention_mask = move_to_device(attention_masks if unpadded else attention_masks[j], cur_layer_device)
                 additional_layer_inputs = {
                     "attention_mask": layer_attention_mask
                 }

@@ -1,0 +1,12 @@
+{
+    "description": "A shorter template to experiment with.",
+    "system": "",
+    "prompt_input": "<bos>### {system}{user_prefix}:\n{instruction}\n\n### Input:\n{input}\n\n### {gpt_prefix}:\n",
+    "prompt_no_input": "<bos>### {system}{user_prefix}:\n{instruction}\n\n### {gpt_prefix}:\n",
+    "prompt_history": "<bos>### {system}{user_prefix}:\n{instruction}\n\n### {gpt_prefix}:\n{output}<eos>",
+    "user_prefix": "Instruction",
+    "gpt_prefix": "Response",
+    "prompt_bos": "",
+    "prompt_eos": "</s>",
+    "response_split": "### Response:\n"    
+}
