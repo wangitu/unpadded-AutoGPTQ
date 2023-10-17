@@ -1,5 +1,5 @@
 <h1 align="center">unpadded-AutoGPTQ</h1>
-<p align="center">An enhanced version of original<a href="https://github.com/PanQiWei/AutoGPTQ"> AutoGPTQ</a> (An easy-to-use LLMs quantization package with user-friendly apis, based on GPTQ algorithm)</p>
+<p align="center">An enhanced version of original<a href="https://github.com/PanQiWei/AutoGPTQ"> AutoGPTQ</a> (An easy-to-use LLMs quantization package based on GPTQ algorithm)</p>
 <h4 align="center">
     <p>
         <b>unpadded-AutoGPTQ</b> |
