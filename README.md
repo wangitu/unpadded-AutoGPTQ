@@ -117,7 +117,7 @@ def main(
     gpt4_en = Dataset.from_list(gpt4_en)
     gpt4 = concatenate_datasets([gpt4_zh, gpt4_en]).shuffle(seed=42)
     
-    # It seems that there might be an issue with identity recognition after the quantization of qwen, so add some hardcoded data"
+    # It seems that there might be an issue with identity recognition after the quantization of qwen, so add some hardcoded data
     if model_type == MODEL_TYPE.Qwen:
         with open('calibration_data/identity/hardcoded.json') as f:
             np.random.seed(42)
