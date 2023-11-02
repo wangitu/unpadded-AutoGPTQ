@@ -5,7 +5,7 @@ import os
 from dataclasses import dataclass, field, fields
 from logging import getLogger
 from os.path import join, isfile, isdir
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Mapping, Optional, Union
 
 import accelerate
 import torch
@@ -244,13 +244,41 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             shape = examples[0]['input_ids'].shape
             assert all(e['input_ids'].shape == e['attention_mask'].shape == shape for e in examples), """each batch in the inputs should contain an equal number of samples, and samples across different batches should have `input_ids` and `attention_mask` of equal length"""
         
-        def nested_move_to_device(v, device):
-            if isinstance(v, torch.Tensor):
-                return move_to_device(v, device)
-            elif isinstance(v, (list, tuple)):
-                return type(v)([nested_move_to_device(e, device) for e in v])
+        def nested_move_to_device(tensor, device, skip_keys=None):
+            """
+            Recursively sends the elements in a nested list/tuple/dictionary of tensors to a given device.
+
+            Args:
+                tensor (nested list/tuple/dictionary of `torch.Tensor`):
+                    The data to send to a given device.
+                device (`torch.device`):
+                    The device to send the data to.
+
+            Returns:
+                The same data structure as `tensor` with all tensors sent to the proper device.
+            """
+            
+            from accelerate.utils.operations import honor_type
+                
+            if isinstance(tensor, (tuple, list)):
+                return honor_type(
+                    tensor, (nested_move_to_device(t, device, skip_keys=skip_keys) for t in tensor)
+                )
+            elif isinstance(tensor, Mapping):
+                if isinstance(skip_keys, str):
+                    skip_keys = [skip_keys]
+                elif skip_keys is None:
+                    skip_keys = []
+                return type(tensor)(
+                    {
+                        k: t if k in skip_keys else nested_move_to_device(t, device, skip_keys=skip_keys)
+                        for k, t in tensor.items()
+                    }
+                )
+            elif hasattr(tensor, "to"):
+                return tensor.to(device)
             else:
-                return v
+                return tensor
 
         class LayerHijacker(nn.Module):
             """hijack layer's forward pass to cache data"""
